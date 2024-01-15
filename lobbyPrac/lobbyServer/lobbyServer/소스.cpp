@@ -5,19 +5,28 @@
 
 #pragma comment(lib,"ws2_32.lib")
 
-// echo -> Multithread echo
+// Multithread echo -> Multithread chatting
 
+// 접속한 클라이언트들 저장할 list 
+std::list<SOCKET> tlist;
 
+void MessageSender(char* buf) {
+	std::list<SOCKET>::iterator it;
+	for (it = tlist.begin(); it != tlist.end(); it++) {
+		send(*it, buf, sizeof(buf), 0);
+	}
+}
+
+// 서버가 하는일 - 채팅 내용 수신, 재배포 
 void threadFunc(SOCKET sock, std::thread t) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
 	while (recv(sock, buf, sizeof(buf), 0) > 0) {
 		std::cout << buf << std::endl;
-		send(sock, buf, sizeof(buf), 0);
+		MessageSender(buf);
 		memset(buf, 0, sizeof(buf));
 	}
 	std::cout << "client disconnected." << std::endl;
-	t.join();
 
 	closesocket(sock);
 }
@@ -57,6 +66,7 @@ int main() {
 		std::thread t1(
 			threadFunc, csock
 		);
+		tlist.push_back(csock);
 		//t1.detach();
 	}	
 
