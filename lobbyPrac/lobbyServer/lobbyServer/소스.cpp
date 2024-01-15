@@ -1,7 +1,23 @@
 #include <iostream>
-#include <Winsock2.h>
+#include <WinSock2.h>
+#include <thread>
 
-#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib,"ws2_32.lib")
+
+// echo -> Multithread echo
+
+void threadFunc(SOCKET sock, std::thread t) {
+	char buf[128];
+	std::cout << "new client connected." << std::endl;
+	while (recv(sock, buf, sizeof(buf), 0) > 0) {
+		std::cout << buf << std::endl;
+		send(sock, buf, sizeof(buf), 0);
+		memset(buf, 0, sizeof(buf));
+	}
+	std::cout << "client disconnected." << std::endl;
+
+	closesocket(sock);
+}
 
 int main() {
 	WSADATA wsa = {0};
@@ -33,18 +49,15 @@ int main() {
 	SOCKADDR_IN caddr = { 0 };
 	int csize = sizeof(caddr);
 	SOCKET csock;
-	char buf[128];
+	
 	while ((csock = accept(lsock, (SOCKADDR*)&caddr, &csize))) {
-		std::cout << "new client connected." << std::endl;
-		while( recv(csock, buf, sizeof(buf), 0) ) {
-			std::cout << buf << std::endl;
-			send(csock, buf, sizeof(buf), 0);
-			memset(buf, 0, sizeof(buf));
-		}
-		std::cout << "client disconnected." << std::endl;
+		std::thread t1(
+			threadFunc, csock
+		);
+		t1.detach();
 	}	
 
-	closesocket(csock);
+	
 	closesocket(lsock);
 
 	WSACleanup();
