@@ -1,10 +1,12 @@
 #include <iostream>
 #include <WinSock2.h>
 #include <thread>
+#include <list>
 
 #pragma comment(lib,"ws2_32.lib")
 
 // echo -> Multithread echo
+
 
 void threadFunc(SOCKET sock, std::thread t) {
 	char buf[128];
@@ -15,6 +17,7 @@ void threadFunc(SOCKET sock, std::thread t) {
 		memset(buf, 0, sizeof(buf));
 	}
 	std::cout << "client disconnected." << std::endl;
+	t.join();
 
 	closesocket(sock);
 }
@@ -54,7 +57,7 @@ int main() {
 		std::thread t1(
 			threadFunc, csock
 		);
-		t1.detach();
+		//t1.detach();
 	}	
 
 	
