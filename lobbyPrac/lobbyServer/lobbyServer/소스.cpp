@@ -10,24 +10,25 @@
 // 접속한 클라이언트들 저장할 list 
 std::list<SOCKET> tlist;
 
-void MessageSender(char* buf) {
+void MessageSender(char* buf, int size, int sockid) {
 	std::list<SOCKET>::iterator it;
 	for (it = tlist.begin(); it != tlist.end(); it++) {
-		send(*it, buf, sizeof(buf), 0);
+		if(*it != sockid) send(*it, buf, size, 0); // 본인한텐 안보내게
+		//std::cout << "id" << *it << std::endl;
 	}
 }
 
 // 서버가 하는일 - 채팅 내용 수신, 재배포 
-void threadFunc(SOCKET sock, std::thread t) {
+void threadFunc(SOCKET sock) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
 	while (recv(sock, buf, sizeof(buf), 0) > 0) {
 		std::cout << buf << std::endl;
-		MessageSender(buf);
+		MessageSender(buf, sizeof(buf), sock);
 		memset(buf, 0, sizeof(buf));
 	}
 	std::cout << "client disconnected." << std::endl;
-
+	// 스레드해제 핑요
 	closesocket(sock);
 }
 
@@ -66,8 +67,9 @@ int main() {
 		std::thread t1(
 			threadFunc, csock
 		);
+		std::cout << "id " << csock << " connected" << std::endl;
 		tlist.push_back(csock);
-		//t1.detach();
+		t1.detach();
 	}	
 
 	

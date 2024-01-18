@@ -1,7 +1,16 @@
 #include <iostream>
 #include <WinSock2.h>
+#include <thread>
 
 #pragma comment(lib,"ws2_32.lib")
+
+void threadFunc(SOCKET sock) {
+	char buf[128] = {};
+	while(true) {
+		recv(sock, buf, sizeof(buf), 0);
+		std::cout <<"from another client : " << buf << std::endl;
+	}
+}
 
 int main() {
 	WSADATA wsa;
@@ -28,18 +37,20 @@ int main() {
 
 	char buf[128] = {};
 
+	std::thread t1(threadFunc, sock);
+
 	while(true) {
 		std::cin >> buf;
 		if (strcmp(buf, "EXIT") == 0) {
 			break;
 		}
 		send(sock, buf, sizeof(buf), 0);
-		recv(sock, buf, sizeof(buf), 0);
-		std::cout << buf << std::endl;
+		//std::cout << buf << std::endl;
 		memset(buf, 0, sizeof(buf));
 	}
 
 	closesocket(sock);
+	t1.join();
 
 	WSACleanup();
 }
