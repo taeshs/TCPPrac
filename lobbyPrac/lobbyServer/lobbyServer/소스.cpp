@@ -10,12 +10,16 @@
 // 접속한 클라이언트들 저장할 list 
 std::list<SOCKET> tlist;
 
+CRITICAL_SECTION cs;
+
 void MessageSender(char* buf, int size, int sockid) {
 	std::list<SOCKET>::iterator it;
+	EnterCriticalSection(&cs);
 	for (it = tlist.begin(); it != tlist.end(); it++) {
 		if(*it != sockid) send(*it, buf, size, 0); // 본인한텐 안보내게
 		//std::cout << "id" << *it << std::endl;
 	}
+	LeaveCriticalSection(&cs);
 }
 
 // 서버가 하는일 - 채팅 내용 수신, 재배포 
@@ -33,6 +37,7 @@ void threadFunc(SOCKET sock) {
 }
 
 int main() {
+	InitializeCriticalSection(&cs);
 	WSADATA wsa = {0};
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { // 0 OR Errorcodes
 		std::cout << "socket start error" << std::endl;
@@ -68,7 +73,9 @@ int main() {
 			threadFunc, csock
 		);
 		std::cout << "id " << csock << " connected" << std::endl;
+		EnterCriticalSection(&cs);
 		tlist.push_back(csock);
+		LeaveCriticalSection(&cs);
 		t1.detach();
 	}	
 
