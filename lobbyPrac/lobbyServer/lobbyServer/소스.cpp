@@ -2,6 +2,7 @@
 #include <WinSock2.h>
 #include <thread>
 #include <list>
+#include "../../mylib/myheader.h"
 
 #pragma comment(lib,"ws2_32.lib")
 
@@ -12,27 +13,45 @@ std::list<SOCKET> tlist;
 
 CRITICAL_SECTION cs;
 
-void MessageSender(char* buf, int size, int sockid) {
+void MessageSenderAll(char* buf, int size, int sockid) {
 	std::list<SOCKET>::iterator it;
+	MYCMD cmd;
+	cmd.nCode = CMD_CHAT;
 	EnterCriticalSection(&cs);
 	for (it = tlist.begin(); it != tlist.end(); it++) {
-		if(*it != sockid) send(*it, buf, size, 0); // 본인한텐 안보내게
+		if (*it != sockid) {
+			send(*it, (char*)&cmd, sizeof(cmd), 0);
+			send(*it, buf, size, 0); // 본인한텐 안보내게
+		}
 		//std::cout << "id" << *it << std::endl;
 	}
 	LeaveCriticalSection(&cs);
 }
 
-// 서버가 하는일 - 채팅 내용 수신, 재배포 
+ 
 void threadFunc(SOCKET sock) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
-	while (recv(sock, buf, sizeof(buf), 0) > 0) {
-		std::cout << buf << std::endl;
-		MessageSender(buf, sizeof(buf), sock);
+	MYCMD cmd;
+
+	while (recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		switch (cmd.nCode) {
+		case CMD_ECHO:
+			recv(sock, buf, sizeof(buf), 0);
+			std::cout <<"ECHO : "<< buf << std::endl;
+			send(sock, (char*)&cmd, sizeof(cmd), 0);
+			send(sock, buf, sizeof(buf), 0);
+			break;
+		case CMD_CHAT:
+			recv(sock, buf, sizeof(buf), 0);
+			std::cout << "CHAT : " << buf << std::endl;
+			MessageSenderAll(buf, sizeof(buf), sock);
+			break;
+		}
 		memset(buf, 0, sizeof(buf));
 	}
 	std::cout << "client disconnected." << std::endl;
-	// 스레드해제 핑요
+
 	closesocket(sock);
 }
 

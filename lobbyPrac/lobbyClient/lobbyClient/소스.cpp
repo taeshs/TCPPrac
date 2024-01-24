@@ -1,14 +1,25 @@
 #include <iostream>
 #include <WinSock2.h>
 #include <thread>
+#include "../../mylib/myheader.h"
 
 #pragma comment(lib,"ws2_32.lib")
 
 void threadFunc(SOCKET sock) {
+	MYCMD cmd;
 	char buf[128] = {};
-	while(true) {
+	while(recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
 		recv(sock, buf, sizeof(buf), 0);
-		std::cout <<"from another client : " << buf << std::endl;
+		switch (cmd.nCode) {
+		case CMD_CHAT:
+			std::cout << "from another client : ";
+			break;
+		case CMD_ECHO:
+			std::cout << "ECHO from SERVER : ";
+			break;
+		}
+		std::cout << buf << std::endl;
+		ZeroMemory(buf, sizeof(buf));
 	}
 }
 
@@ -39,16 +50,29 @@ int main() {
 
 	std::thread t1(threadFunc, sock);
 
+	MYCMD cmd;
 	while(true) {
 		std::cin >> buf;
 		if (strcmp(buf, "EXIT") == 0) {
 			break;
 		}
-		send(sock, buf, sizeof(buf), 0);
+		else if (strcmp(buf, "ECHO") == 0) {
+			std::cout << "ECHO 할 문자 입력 : ";
+			std::cin >> buf;
+			cmd.nCode = CMD_ECHO;
+			send(sock, (char*)&cmd, sizeof(cmd), 0);
+			send(sock, buf, sizeof(buf), 0);
+			memset(buf, 0, sizeof(buf));
+		}
+		else {
+			cmd.nCode = CMD_CHAT;
+			send(sock, (char*)&cmd, sizeof(cmd), 0);
+			send(sock, buf, sizeof(buf), 0);
+			memset(buf, 0, sizeof(buf));
+		}
 		//std::cout << buf << std::endl;
-		memset(buf, 0, sizeof(buf));
 	}
-
+	shutdown(sock, SD_BOTH);
 	closesocket(sock);
 	t1.join();
 
