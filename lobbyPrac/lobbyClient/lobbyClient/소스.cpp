@@ -5,16 +5,35 @@
 
 #pragma comment(lib,"ws2_32.lib")
 
+void Roomthread(SOCKET sock) {
+	std::cout << "Room entered." << std::endl;
+	char buf[128];
+	while (true) {
+		// 방 안.
+		std::cin >> buf;
+		send(sock, buf, sizeof(buf), 0);
+		ZeroMemory(buf, sizeof(buf));
+		recv(sock, buf, sizeof(buf), 0);
+		std::cout << "SERVER ROOM SAYS : ";
+		std::cout << buf << std::endl;
+		ZeroMemory(buf, sizeof(buf));
+	}
+}
+
 void threadFunc(SOCKET sock) {
 	MYCMD cmd;
 	char buf[128] = {};
 	while(recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		puts("thr1");
+		if (cmd.nCode == CMDCODE::CMD_ENTERROOM) {
+			break;
+		}
 		recv(sock, buf, sizeof(buf), 0);
 		switch (cmd.nCode) {
-		case CMD_CHAT:
+		case CMDCODE::CMD_CHAT:
 			std::cout << "from another client : ";
 			break;
-		case CMD_ECHO:
+		case CMDCODE::CMD_ECHO:
 			std::cout << "ECHO from SERVER : ";
 			break;
 		}
@@ -59,13 +78,21 @@ int main() {
 		else if (strcmp(buf, "ECHO") == 0) {
 			std::cout << "ECHO 할 문자 입력 : ";
 			std::cin >> buf;
-			cmd.nCode = CMD_ECHO;
+			cmd.nCode = CMDCODE::CMD_ECHO;
 			send(sock, (char*)&cmd, sizeof(cmd), 0);
 			send(sock, buf, sizeof(buf), 0);
 			memset(buf, 0, sizeof(buf));
 		}
+		else if (strcmp(buf, "ENTER") == 0) {
+			std::cout << "방에 진입합니다..." << std::endl;
+			cmd.nCode = CMDCODE::CMD_ENTERROOM;
+			send(sock, (char*)&cmd, sizeof(cmd), 0);
+			std::thread room_thread(Roomthread, sock);
+			room_thread.join();
+		}
 		else {
-			cmd.nCode = CMD_CHAT;
+			std::cout << "chat 보냄" << std::endl;
+			cmd.nCode = CMDCODE::CMD_CHAT;
 			send(sock, (char*)&cmd, sizeof(cmd), 0);
 			send(sock, buf, sizeof(buf), 0);
 			memset(buf, 0, sizeof(buf));
