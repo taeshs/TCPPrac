@@ -1,14 +1,18 @@
 
 typedef enum class CMDCODE {
-	CMD_ECHO = 0,
-	CMD_CHAT = 100,
-	CMD_ENTERROOM = 200,
+	CMD_NULL = 0,
+	CMD_ECHO = 100,
+	CMD_CHAT = 200,
+	CMD_ENTERROOM = 1000,
 	CMD_LEAVEROOM,
+	CMD_ROOMCHAT = 2020,
 }CMDCODE;
 
 typedef struct MYCMD {
 	CMDCODE nCode;
 }MYCMD;
+
+// MYCMD에 플레이어 네임?
 
 typedef enum class THREADSTATUS {
 	TH_NO_ROOM = 1001,

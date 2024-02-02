@@ -15,6 +15,14 @@ std::list<SOCKET> g_cli_list;
 
 CRITICAL_SECTION g_c_cs;
 
+void g_Lock() {
+	EnterCriticalSection(&g_c_cs);
+}
+
+void g_Unlock() {
+	LeaveCriticalSection(&g_c_cs);
+}
+
 
 
 class Room {
@@ -25,10 +33,12 @@ private:
 	CRITICAL_SECTION m_room_cs;
 
 	void lock() {
+		puts("room lockㅠ");
 		EnterCriticalSection(&m_room_cs);
 	}
 
 	void unlock() {
+		puts("room unlockㅛ");
 		LeaveCriticalSection(&m_room_cs);
 	}
 
@@ -78,9 +88,44 @@ public:
 
 	void display() {
 		lock();
-		std::cout << "Room name : " << name << "nums of player : " << num_player << std::endl;;
+		std::cout << "Room name : " << name << " / nums of player : " << num_player << std::endl;;
 		for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
-			std::cout << "player '" << players[i] << "'" << std::endl;
+			if (players[i] == NULL) {
+				std::cout << "EMPTY" << std::endl;
+			}
+			else {
+				std::cout << "player '" << players[i] << "'" << std::endl;
+			}
+		}
+		unlock();
+	}
+
+	FR isin(SOCKET player) {
+		lock();
+		for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
+			if (player == players[i]) {
+				unlock();
+				return FR::SUCCESS;
+			}
+		}
+		unlock();
+		return FR::FAIL;
+		
+	}
+
+	void chatToRoom(SOCKET player, char* buf, int buf_size) {
+		lock();
+		MYCMD cmd;
+		for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
+			//player != players[i] && 
+			if (players[i] != NULL) {
+				cmd.nCode = CMDCODE::CMD_ROOMCHAT;
+				std::cout << "send to " << players[i] << " :" << buf << std::endl;
+				// cmd send
+				send(players[i], (char*)&cmd, sizeof(cmd), 0);
+				// buf send
+				send(players[i], buf, buf_size, 0);
+			}
 		}
 		unlock();
 	}
@@ -93,10 +138,12 @@ private:
 	CRITICAL_SECTION m_room_list_cs;
 
 	void lock() {
+		puts("room list lockㅜ");
 		EnterCriticalSection(&m_room_list_cs);
 	}
 
 	void unlock() {
+		puts("room list unlockㅗ");
 		LeaveCriticalSection(&m_room_list_cs);
 	}
 
@@ -178,6 +225,7 @@ public:
 		lock();
 		if (room_list.empty()) {
 			std::cout << "empty." << std::endl;
+			unlock();
 			return;
 		}
 		std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
@@ -185,6 +233,20 @@ public:
 			(*it)->display();
 		}
 		std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+		unlock();
+	}
+
+	void chatToRoom(SOCKET player, char* buf, int buf_size) {
+		std::list<Room*>::iterator it;
+		lock();
+		for (it = room_list.begin(); it != room_list.end(); it++) {
+			if ((*it)->isin(player) == FR::SUCCESS) {
+				(*it)->chatToRoom(player, buf, buf_size);
+				puts("chat to room");
+				unlock();
+				return;
+			}
+		}
 		unlock();
 	}
 };
@@ -232,11 +294,24 @@ void RoomThread(SOCKET sock) {
 	send(sock, (char*)&cmd, sizeof(cmd), 0);
 
 	g_rm.enter_room(sock);
-	while( recv(sock, buf, sizeof(buf), 0) > 0 ) {
-		// 방 안.
-		//recv(sock, buf, sizeof(buf), 0);
-		std::cout << "echo from cli : " << buf << std::endl;
-		send(sock, buf, sizeof(buf), 0);
+	while(recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		std::cout << "room thread" << std::endl;
+		if (cmd.nCode == CMDCODE::CMD_LEAVEROOM) {
+			g_Lock();
+			g_cli_list.push_back(sock);
+			g_Unlock();
+			g_rm.leave(sock);
+			
+			return;
+		}
+		// 함수만 구현함. 방 내에 채팅
+		if (cmd.nCode != CMDCODE::CMD_ROOMCHAT) {
+			puts("error");
+		}
+		recv(sock, buf, sizeof(buf), 0);
+		// 방 안. leave room 하기
+		g_rm.chatToRoom(sock, buf, sizeof(buf));
+		std::cout << "room chat from cli : " << buf << std::endl;
 		ZeroMemory(buf, sizeof(buf));
 	}
 }
@@ -246,13 +321,13 @@ void threadFunc(SOCKET sock) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
 	MYCMD cmd;
-	THS ths = THS::TH_NO_ROOM;
 
 	while (recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		std::cout << "lobby thread" << std::endl;
 		switch (cmd.nCode) {
 		case CMDCODE::CMD_ECHO:
 			recv(sock, buf, sizeof(buf), 0);
-			std::cout <<"ECHO : "<< buf << std::endl;
+			std::cout << "ECHO : " << buf << std::endl;
 			send(sock, (char*)&cmd, sizeof(cmd), 0);
 			send(sock, buf, sizeof(buf), 0);
 			break;
@@ -261,18 +336,21 @@ void threadFunc(SOCKET sock) {
 			std::cout << "CHAT : " << buf << std::endl;
 			MessageSenderAll(buf, sizeof(buf), sock);
 			break;
-		case CMDCODE::CMD_ENTERROOM:
-			ths = THS::TH_ROOM_IN;
+		case CMDCODE::CMD_ENTERROOM: {
 			std::cout << "ENTERING ROOM.." << std::endl;
-			break;
-		}
-		if (ths == THS::TH_ROOM_IN) {
+			g_Lock();
 			g_cli_list.remove(sock);
+			g_Unlock();
 			std::thread t1(RoomThread, sock);
 			t1.join();
+			puts("comeback");
 			break;
 		}
+		default:
+			puts("something gone wrong....");
+		}
 		memset(buf, 0, sizeof(buf));
+		cmd.nCode = CMDCODE::CMD_NULL;
 	}
 	std::cout << "client disconnected." << std::endl;
 
