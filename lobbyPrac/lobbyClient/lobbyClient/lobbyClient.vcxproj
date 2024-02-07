@@ -141,6 +141,9 @@
   <ItemGroup>
     <ClCompile Include="소스.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\mylib\myheader.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -1,3 +1,9 @@
+#include <iostream>
+#include <WinSock2.h>
+#include <thread>
+#include <list>
+#include <string>
+#include <conio.h>
 
 typedef enum class CMDCODE {
 	CMD_NULL = 0,
