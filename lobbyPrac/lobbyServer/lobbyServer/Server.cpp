@@ -7,7 +7,7 @@
 // Multithread echo -> Multithread chatting
 
 // 접속한 클라이언트들 저장할 list 
-std::list<SOCKET> g_cli_list;
+std::list<ClientSock> g_cli_list;
 
 CRITICAL_SECTION g_c_cs;
 
@@ -20,15 +20,26 @@ void g_Unlock() {
 	LeaveCriticalSection(&g_c_cs);
 }
 
+void custom_list_remove(ClientSock client) {
+	std::list<ClientSock>::iterator it;
+	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
+		if ((*it).player_name == client.player_name) {
+			g_cli_list.erase(it);
+			return;
+		}
+	}
+}
+
+
 void MessageSenderAll(char* buf, int size, int sockid) {
-	std::list<SOCKET>::iterator it;
+	std::list<ClientSock>::iterator it;
 	MYCMD cmd;
 	cmd.nCode = CMDCODE::CMD_CHAT;
 	EnterCriticalSection(&g_c_cs);
 	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
-		if (*it != sockid) {
-			send(*it, (char*)&cmd, sizeof(cmd), 0);
-			send(*it, buf, size, 0); // 본인한텐 안보내게
+		if ((*it).socket != sockid) {
+			send((*it).socket, (char*)&cmd, sizeof(cmd), 0);
+			send((*it).socket, buf, size, 0); // 본인한텐 안보내게
 		}
 		//std::cout << "id" << *it << std::endl;
 	}
@@ -61,7 +72,10 @@ void RoomThread(SOCKET sock) {
 		std::cout << "room thread" << std::endl;
 		if (cmd.nCode == CMDCODE::CMD_LEAVEROOM) {
 			g_Lock();
-			g_cli_list.push_back(sock);
+			ClientSock temp;
+			temp.socket = sock;
+			temp.player_name = cmd.player_name;
+			g_cli_list.push_back(temp);
 			g_Unlock();
 			g_rm.leave(sock);
 			
@@ -102,7 +116,10 @@ void threadFunc(SOCKET sock) {
 		case CMDCODE::CMD_ENTERROOM: {
 			std::cout << "ENTERING ROOM.." << std::endl;
 			g_Lock();
-			g_cli_list.remove(sock);
+			ClientSock temp;
+			temp.socket = sock;
+			temp.player_name = cmd.player_name;
+			custom_list_remove(temp); /// custom
 			g_Unlock();
 			std::thread t1(RoomThread, sock);
 			t1.join();
@@ -153,15 +170,32 @@ int main() {
 	SOCKET csock;
 
 	std::thread th_rm(RoomManagerThread);
+	MYCMD firstCmd;
+	ClientSock temp;
 	
 	while ((csock = accept(lsock, (SOCKADDR*)&caddr, &csize))) {
+		
+		recv(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
+		if (firstCmd.nCode == CMDCODE::CMD_CONNECT) {
+			firstCmd.nCode = CMDCODE::CMD_ACCEPT;
+			send(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
+		}
+		
+
+		
+		g_Lock();
+		temp.socket = csock;
+		temp.player_name = firstCmd.player_name;
+		g_cli_list.push_back(temp);
+		g_Unlock();
+
+		std::cout << "hi, " << firstCmd.player_name << ". id " << csock << " connected" << std::endl;
 		std::thread t1(
 			threadFunc, csock
 		);
-		std::cout << "id " << csock << " connected" << std::endl;
-		EnterCriticalSection(&g_c_cs);
-		g_cli_list.push_back(csock);
-		LeaveCriticalSection(&g_c_cs);
+		
+		
+
 		t1.detach();
 	}	
 
