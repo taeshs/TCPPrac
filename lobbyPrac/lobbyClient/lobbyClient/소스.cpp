@@ -6,13 +6,13 @@ void Roomthread(SOCKET sock);
 void LobbyRecvThread(SOCKET sock);
 void RoomRecvThread(SOCKET sock);
 
-std::string g_pname;
+char g_pname[20];
 
 void Roomthread(SOCKET sock) {
 	std::cout << "Room entered." << std::endl;
 	char buf[128];
 	MYCMD cmd;
-	cmd.player_name = g_pname;
+	strcpy(cmd.player_name, g_pname);
 	std::thread th_RoomRecv(RoomRecvThread, sock);
 	th_RoomRecv.detach();
 	while (true) {
@@ -103,16 +103,16 @@ int main() {
 	}
 	std::cout << "server connected." << std::endl;
 
-	/*MYCMD firstCmd;
+	MYCMD firstCmd;
 	firstCmd.nCode = CMDCODE::CMD_CONNECT;
-	firstCmd.player_name = g_pname;
+	strcpy(firstCmd.player_name, g_pname);
 	send(sock, (char*)&firstCmd, sizeof(firstCmd), 0);
 	memset(&firstCmd, 0, sizeof(firstCmd));
 	recv(sock, (char*)&firstCmd, sizeof(firstCmd), 0);
-	if (!(firstCmd.nCode == CMDCODE::CMD_ACCEPT && firstCmd.player_name == g_pname)) {
+	if (!(firstCmd.nCode == CMDCODE::CMD_ACCEPT)) {
 		std::cout << "somethin wrong..." << std::endl;
 		return 0;
-	}*/
+	}
 
 	char buf[128] = {};
 
@@ -120,7 +120,7 @@ int main() {
 	t1.detach();
 
 	MYCMD cmd;
-	cmd.player_name = g_pname;
+	strcpy(cmd.player_name, g_pname);
 	while(true) {
 		puts("lobby thread sender");
 		std::cin >> buf;

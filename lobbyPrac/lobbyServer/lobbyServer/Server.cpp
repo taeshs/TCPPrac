@@ -20,13 +20,21 @@ void g_Unlock() {
 	LeaveCriticalSection(&g_c_cs);
 }
 
-void custom_list_remove(ClientSock client) {
+void custom_list_remove(SOCKET sock) {
 	std::list<ClientSock>::iterator it;
 	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
-		if ((*it).player_name == client.player_name) {
+		if ((*it).socket == sock) {
 			g_cli_list.erase(it);
 			return;
 		}
+	}
+}
+
+void cli_list_display() {
+	std::cout << "list display" << std::endl;
+	std::list<ClientSock>::iterator it;
+	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
+		std::cout << "name : " << (*it).player_name << "id : " << (*it).socket << std::endl;
 	}
 }
 
@@ -57,6 +65,7 @@ void RoomManagerThread() {
 		}
 		
 		g_rm.display();
+		cli_list_display();
 	}
 }
 // ¹æ µé¿È.
@@ -74,7 +83,7 @@ void RoomThread(SOCKET sock) {
 			g_Lock();
 			ClientSock temp;
 			temp.socket = sock;
-			temp.player_name = cmd.player_name;
+			strcpy(temp.player_name, cmd.player_name);
 			g_cli_list.push_back(temp);
 			g_Unlock();
 			g_rm.leave(sock);
@@ -98,6 +107,7 @@ void threadFunc(SOCKET sock) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
 	MYCMD cmd;
+	ClientSock temp;
 
 	while (recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
 		std::cout << "lobby thread" << std::endl;
@@ -116,10 +126,7 @@ void threadFunc(SOCKET sock) {
 		case CMDCODE::CMD_ENTERROOM: {
 			std::cout << "ENTERING ROOM.." << std::endl;
 			g_Lock();
-			ClientSock temp;
-			temp.socket = sock;
-			temp.player_name = cmd.player_name;
-			custom_list_remove(temp); /// custom
+			custom_list_remove(sock); /// custom
 			g_Unlock();
 			std::thread t1(RoomThread, sock);
 			t1.join();
@@ -134,6 +141,7 @@ void threadFunc(SOCKET sock) {
 	}
 	std::cout << "client disconnected." << std::endl;
 
+	custom_list_remove(sock);
 	closesocket(sock);
 }
 
@@ -185,7 +193,7 @@ int main() {
 		
 		g_Lock();
 		temp.socket = csock;
-		temp.player_name = firstCmd.player_name;
+		strcpy(temp.player_name, firstCmd.player_name);
 		g_cli_list.push_back(temp);
 		g_Unlock();
 
