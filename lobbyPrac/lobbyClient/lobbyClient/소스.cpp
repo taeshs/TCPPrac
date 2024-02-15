@@ -12,7 +12,7 @@ void Roomthread(SOCKET sock) {
 	std::cout << "Room entered." << std::endl;
 	char buf[128];
 	MYCMD cmd;
-	strcpy(cmd.player_name, g_pname);
+	//strcpy(cmd.player_name, g_pname);
 	std::thread th_RoomRecv(RoomRecvThread, sock);
 	th_RoomRecv.detach();
 	while (true) {
@@ -78,8 +78,11 @@ void LobbyRecvThread(SOCKET sock) {
 
 
 int main() {
+	char password[MAX_PASSWORD_SIZE];
 	std::cout << "ENTER NAME : " << std::endl;
 	std::cin >> g_pname;
+	std::cout << "ENTER PASSWORD : " << std::endl;
+	std::cin >> password;
 
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { // 0 OR Errorcodes
@@ -103,13 +106,22 @@ int main() {
 	}
 	std::cout << "server connected." << std::endl;
 
+
+	PlayerLoginData LoginData;
 	MYCMD firstCmd;
 	firstCmd.nCode = CMDCODE::CMD_CONNECT;
-	strcpy(firstCmd.player_name, g_pname);
+	// 로그인 요청
 	send(sock, (char*)&firstCmd, sizeof(firstCmd), 0);
+
+	// 로그인 데이터 보내기
+	strcpy(LoginData.player_name, g_pname);
+	strcpy(LoginData.password, password);
+	send(sock, (char*)&LoginData, sizeof(PlayerLoginData), 0);
+
+	// 로그인 성공 여부
 	memset(&firstCmd, 0, sizeof(firstCmd));
 	recv(sock, (char*)&firstCmd, sizeof(firstCmd), 0);
-	if (!(firstCmd.nCode == CMDCODE::CMD_ACCEPT)) {
+	if (!(firstCmd.nCode == CMDCODE::CMD_LOGIN_ACCEPT)) {
 		std::cout << "somethin wrong..." << std::endl;
 		return 0;
 	}
@@ -120,7 +132,7 @@ int main() {
 	t1.detach();
 
 	MYCMD cmd;
-	strcpy(cmd.player_name, g_pname);
+	//strcpy(cmd.player_name, g_pname);
 	while(true) {
 		puts("lobby thread sender");
 		std::cin >> buf;

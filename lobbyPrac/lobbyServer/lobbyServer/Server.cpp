@@ -20,6 +20,17 @@ void g_Unlock() {
 	LeaveCriticalSection(&g_c_cs);
 }
 
+///////
+/// db class 내부에서 다시 구현할것. (테스트용)
+bool login(PlayerLoginData a, PlayerLoginData b) {
+	if (strcmp(a.player_name, b.player_name) == 0) {
+		if (strcmp(a.password, b.password) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void custom_list_remove(SOCKET sock) {
 	std::list<ClientSock>::iterator it;
 	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
@@ -34,7 +45,7 @@ void cli_list_display() {
 	std::cout << "list display" << std::endl;
 	std::list<ClientSock>::iterator it;
 	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
-		std::cout << "name : " << (*it).player_name << "id : " << (*it).socket << std::endl;
+		std::cout << "--- " << g_cli_list.size() << "players. ---" << std::endl << "name : " << (*it).player_name << " / id : " << (*it).socket << std::endl;
 	}
 }
 
@@ -83,7 +94,7 @@ void RoomThread(SOCKET sock) {
 			g_Lock();
 			ClientSock temp;
 			temp.socket = sock;
-			strcpy(temp.player_name, cmd.player_name);
+			//strcpy(temp.player_name, cmd.player_name);
 			g_cli_list.push_back(temp);
 			g_Unlock();
 			g_rm.leave(sock);
@@ -180,24 +191,41 @@ int main() {
 	std::thread th_rm(RoomManagerThread);
 	MYCMD firstCmd;
 	ClientSock temp;
+
+	PlayerLoginData exampledata;
+	strcpy(exampledata.player_name, "example");
+	strcpy(exampledata.password, "examplep");
+
+	PlayerLoginData recvLoginData;
 	
 	while ((csock = accept(lsock, (SOCKADDR*)&caddr, &csize))) {
 		
+		////// login
 		recv(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
 		if (firstCmd.nCode == CMDCODE::CMD_CONNECT) {
-			firstCmd.nCode = CMDCODE::CMD_ACCEPT;
+			recv(csock, (char*)&recvLoginData, sizeof(PlayerLoginData), 0);
+			if (login(exampledata, recvLoginData)) {
+				firstCmd.nCode = CMDCODE::CMD_LOGIN_ACCEPT;
+				std::cout << "login successed." << std::endl;
+			}
+			else {
+				firstCmd.nCode = CMDCODE::CMD_LOGIN_FAIL;
+				std::cout << "login failed." << std::endl;
+			}
+			// accept or fail 예시 사용시 동작함. -> 이제 DB 연동해서 있으면 로그인 OR 없으면 등록으로 진행.
+			
 			send(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
 		}
-		
+		//////
 
 		
 		g_Lock();
 		temp.socket = csock;
-		strcpy(temp.player_name, firstCmd.player_name);
+		// strcpy(temp.player_name, firstCmd.player_name); 수정 필요
 		g_cli_list.push_back(temp);
 		g_Unlock();
 
-		std::cout << "hi, " << firstCmd.player_name << ". id " << csock << " connected" << std::endl;
+		std::cout << "hi, " << recvLoginData.player_name << ". id " << csock << " connected" << std::endl;
 		std::thread t1(
 			threadFunc, csock
 		);
