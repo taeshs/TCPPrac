@@ -140,11 +140,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="db.cpp" />
     <ClCompile Include="Rooms.cpp" />
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\mylib\myheader.h" />
+    <ClInclude Include="db.h" />
     <ClInclude Include="Rooms.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

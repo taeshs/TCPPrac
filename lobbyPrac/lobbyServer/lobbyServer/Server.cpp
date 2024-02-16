@@ -1,6 +1,6 @@
 
 #include "Rooms.h"
-
+#include "db.h"
 
 #pragma comment(lib,"ws2_32.lib")
 
@@ -12,6 +12,8 @@ std::list<ClientSock> g_cli_list;
 CRITICAL_SECTION g_c_cs;
 
 Rooms_manager g_rm;
+
+DB g_db;
 
 void g_Lock() { // client list lock
 	EnterCriticalSection(&g_c_cs);
@@ -192,11 +194,9 @@ int main() {
 	MYCMD firstCmd;
 	ClientSock temp;
 
-	PlayerLoginData exampledata;
-	strcpy(exampledata.player_name, "example");
-	strcpy(exampledata.password, "examplep");
-
 	PlayerLoginData recvLoginData;
+
+	int loginresult;
 	
 	while ((csock = accept(lsock, (SOCKADDR*)&caddr, &csize))) {
 		
@@ -204,14 +204,24 @@ int main() {
 		recv(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
 		if (firstCmd.nCode == CMDCODE::CMD_CONNECT) {
 			recv(csock, (char*)&recvLoginData, sizeof(PlayerLoginData), 0);
-			if (login(exampledata, recvLoginData)) {
+			loginresult = g_db.Login((SQLCHAR*)recvLoginData.player_name, recvLoginData.password);
+			if (loginresult == LOGIN_SUCCESS) {
 				firstCmd.nCode = CMDCODE::CMD_LOGIN_ACCEPT;
-				std::cout << "login successed." << std::endl;
+				std::cout << "LOGIN : login successed." << std::endl;
+			}
+			else if (loginresult == LOGIN_FAIL) {
+				firstCmd.nCode = CMDCODE::CMD_LOGIN_FAIL;
+				std::cout << "LOGIN : login failed." << std::endl;
+			}
+			else if (loginresult == LOGIN_CREATE_NEW) {
+				firstCmd.nCode = CMDCODE::CMD_LOGIN_ACCEPT;
+				std::cout << "LOGIN : create new id." << std::endl;
 			}
 			else {
-				firstCmd.nCode = CMDCODE::CMD_LOGIN_FAIL;
-				std::cout << "login failed." << std::endl;
+				std::cout <<"--------------" << loginresult << std::endl;
 			}
+
+			
 			// accept or fail 예시 사용시 동작함. -> 이제 DB 연동해서 있으면 로그인 OR 없으면 등록으로 진행.
 			
 			send(csock, (char*)&firstCmd, sizeof(firstCmd), 0);
@@ -221,7 +231,7 @@ int main() {
 		
 		g_Lock();
 		temp.socket = csock;
-		// strcpy(temp.player_name, firstCmd.player_name); 수정 필요
+		strcpy(temp.player_name, recvLoginData.player_name);
 		g_cli_list.push_back(temp);
 		g_Unlock();
 

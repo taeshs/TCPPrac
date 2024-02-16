@@ -1,13 +1,21 @@
 #pragma once
-#include <windows.h>
+
+#include <Windows.h>
 #include <sql.h>
 #include <sqlext.h>
 #include <string>
 
-#define MAX_ID_SIZE 50
-#define MAX_PASSWORD_SIZE 50
+#define MAX_PLAYER_NAME_SIZE 21
+#define MAX_PASSWORD_SIZE 21
 
-class MyDB {
+typedef enum loginResult {
+	LOGIN_SUCCESS = 99,
+	LOGIN_FAIL = -1,
+	LOGIN_CREATE_NEW = 101
+}loginResult;
+
+class DB
+{
 	SQLHENV henv;
 	SQLHDBC hdbc;
 	SQLRETURN ret;
@@ -19,9 +27,9 @@ class MyDB {
 	SQLCHAR state[7], message[256];
 
 public:
-	MyDB();
+	DB();
 
-	~MyDB();
+	~DB();
 
 	void AllocationHandles();
 
@@ -29,9 +37,6 @@ public:
 	
 	bool InsertPlayer(SQLCHAR* id, SQLCHAR* password, SQLINTEGER score);
 
-	int Login(SQLCHAR* id, std::string password);
-	
-	bool DeletePlayerById(SQLCHAR* id);
-	
-	void SeeAll();
+	int Login(SQLCHAR* id, char* password);
 };
+
