@@ -46,8 +46,9 @@ void custom_list_remove(SOCKET sock) {
 void cli_list_display() {
 	std::cout << "list display" << std::endl;
 	std::list<ClientSock>::iterator it;
+	std::cout << "--- " << g_cli_list.size() << "players. ---" << std::endl;
 	for (it = g_cli_list.begin(); it != g_cli_list.end(); it++) {
-		std::cout << "--- " << g_cli_list.size() << "players. ---" << std::endl << "name : " << (*it).player_name << " / id : " << (*it).socket << std::endl;
+		std::cout  << "name : " << (*it).player_name << " / id : " << (*it).socket << std::endl;
 	}
 }
 
@@ -82,67 +83,70 @@ void RoomManagerThread() {
 	}
 }
 // 방 들옴.
-void RoomThread(SOCKET sock) {
-	std::cout << "client '" << sock << "' joined." << std::endl;
+void RoomThread(ClientSock sock) {
+	std::cout << "client '" << sock.socket << "' joined." << std::endl;
 	char buf[128];
 	MYCMD cmd;
+	int score = g_db.getScore((SQLCHAR*)sock.player_name);
 	cmd.nCode = CMDCODE::CMD_ENTERROOM;
-	send(sock, (char*)&cmd, sizeof(cmd), 0);
+	send(sock.socket, (char*)&cmd, sizeof(cmd), 0);
 
 	g_rm.enter_room(sock);
-	while(recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+	while(recv(sock.socket, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		std::cout<<score++<<std::endl;
 		std::cout << "room thread" << std::endl;
 		if (cmd.nCode == CMDCODE::CMD_LEAVEROOM) {
 			g_Lock();
-			ClientSock temp;
-			temp.socket = sock;
-			//strcpy(temp.player_name, cmd.player_name);
-			g_cli_list.push_back(temp);
+			g_cli_list.push_back(sock);
 			g_Unlock();
 			g_rm.leave(sock);
-			
+			g_db.setScore((SQLCHAR*)sock.player_name, --score);
 			return;
 		}
-		// 함수만 구현함. 방 내에 채팅
 		if (cmd.nCode != CMDCODE::CMD_ROOMCHAT) {
 			puts("error");
 		}
-		recv(sock, buf, sizeof(buf), 0);
-		// 방 안. leave room 하기
+		recv(sock.socket, buf, sizeof(buf), 0);
 		g_rm.chatToRoom(sock, buf, sizeof(buf));
 		std::cout << "room chat from cli : " << buf << std::endl;
 		ZeroMemory(buf, sizeof(buf));
 	}
+	g_db.setScore((SQLCHAR*)sock.player_name, score);
 }
 
  
-void threadFunc(SOCKET sock) {
+void threadFunc(ClientSock sock) {
 	char buf[128];
 	std::cout << "new client connected." << std::endl;
 	MYCMD cmd;
 	ClientSock temp;
+	int score = g_db.getScore((SQLCHAR*)sock.player_name);
 
-	while (recv(sock, (char*)&cmd, sizeof(cmd), 0) > 0) {
+	while (recv(sock.socket, (char*)&cmd, sizeof(cmd), 0) > 0) {
+		std::cout << score++ << std::endl;
 		std::cout << "lobby thread" << std::endl;
 		switch (cmd.nCode) {
 		case CMDCODE::CMD_ECHO:
-			recv(sock, buf, sizeof(buf), 0);
+			recv(sock.socket, buf, sizeof(buf), 0);
 			std::cout << "ECHO : " << buf << std::endl;
-			send(sock, (char*)&cmd, sizeof(cmd), 0);
-			send(sock, buf, sizeof(buf), 0);
+			send(sock.socket, (char*)&cmd, sizeof(cmd), 0);
+			send(sock.socket, buf, sizeof(buf), 0);
 			break;
 		case CMDCODE::CMD_CHAT:
-			recv(sock, buf, sizeof(buf), 0);
+			recv(sock.socket, buf, sizeof(buf), 0);
 			std::cout << "CHAT : " << buf << std::endl;
-			MessageSenderAll(buf, sizeof(buf), sock);
+			MessageSenderAll(buf, sizeof(buf), sock.socket);
 			break;
 		case CMDCODE::CMD_ENTERROOM: {
+			score--;
 			std::cout << "ENTERING ROOM.." << std::endl;
 			g_Lock();
-			custom_list_remove(sock); /// custom
+			custom_list_remove(sock.socket); /// custom
 			g_Unlock();
 			std::thread t1(RoomThread, sock);
+			g_db.setScore((SQLCHAR*)sock.player_name, (SQLINTEGER)score);
 			t1.join();
+			score = g_db.getScore((SQLCHAR*)sock.player_name);
 			puts("comeback");
 			break;
 		}
@@ -152,10 +156,11 @@ void threadFunc(SOCKET sock) {
 		memset(buf, 0, sizeof(buf));
 		cmd.nCode = CMDCODE::CMD_NULL;
 	}
+	g_db.setScore((SQLCHAR*)sock.player_name,(SQLINTEGER)score);
 	std::cout << "client disconnected." << std::endl;
 
-	custom_list_remove(sock);
-	closesocket(sock);
+	custom_list_remove(sock.socket);
+	closesocket(sock.socket);
 }
 
 int main() {
@@ -192,7 +197,7 @@ int main() {
 
 	std::thread th_rm(RoomManagerThread);
 	MYCMD firstCmd;
-	ClientSock temp;
+	ClientSock cs_sock;
 
 	PlayerLoginData recvLoginData;
 
@@ -230,14 +235,14 @@ int main() {
 
 		
 		g_Lock();
-		temp.socket = csock;
-		strcpy(temp.player_name, recvLoginData.player_name);
-		g_cli_list.push_back(temp);
+		cs_sock.socket = csock;
+		strcpy(cs_sock.player_name, recvLoginData.player_name);
+		g_cli_list.push_back(cs_sock);
 		g_Unlock();
 
 		std::cout << "hi, " << recvLoginData.player_name << ". id " << csock << " connected" << std::endl;
 		std::thread t1(
-			threadFunc, csock
+			threadFunc, cs_sock
 		);
 		
 		

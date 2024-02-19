@@ -21,10 +21,16 @@ class DB
 	SQLRETURN ret;
 	SQLHSTMT hstmt;
 
+	CRITICAL_SECTION db_cs;
+
 	// for see errorcodes
 	SQLSMALLINT length;
 	SQLINTEGER rec = 0, native;
 	SQLCHAR state[7], message[256];
+
+	void lock();
+
+	void unlock();
 
 public:
 	DB();
@@ -34,9 +40,14 @@ public:
 	void AllocationHandles();
 
 	void Connect(SQLWCHAR* w_dbname, SQLWCHAR* w_username, SQLWCHAR* w_password);
-	
+
 	bool InsertPlayer(SQLCHAR* id, SQLCHAR* password, SQLINTEGER score);
 
 	int Login(SQLCHAR* id, char* password);
+
+	int getScore(SQLCHAR* id);
+
+	bool setScore(SQLCHAR* id, SQLINTEGER score);
+	
 };
 

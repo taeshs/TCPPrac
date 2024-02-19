@@ -16,7 +16,7 @@ void Room::unlock() {
 	LeaveCriticalSection(&m_room_cs);
 }
 
-FR Room::enter_room(SOCKET player) {
+FR Room::enter_room(ClientSock player) {
 	lock();
 	if (num_player == MAX_ROOM_PLAYER) {
 		unlock();
@@ -24,7 +24,7 @@ FR Room::enter_room(SOCKET player) {
 	}
 	else {
 		for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
-			if (players[i] == NULL) {
+			if (players[i].socket == NULL) {
 				players[i] = player;
 				num_player++;
 				unlock();
@@ -36,11 +36,11 @@ FR Room::enter_room(SOCKET player) {
 	return FR::F_ERROR;
 }
 
-FR Room::leave(SOCKET player) {
+FR Room::leave(ClientSock player) {
 	lock();
 	for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
-		if (players[i] == player) {
-			players[i] = NULL;
+		if (players[i].socket == player.socket) {
+			players[i].socket = NULL;
 			num_player--;
 			if (num_player == 0) {
 				unlock();
@@ -58,20 +58,20 @@ void Room::display() {
 	lock();
 	std::cout << "Room name : " << name << " / nums of player : " << num_player << std::endl;;
 	for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
-		if (players[i] == NULL) {
+		if (players[i].socket == NULL) {
 			std::cout << "EMPTY" << std::endl;
 		}
 		else {
-			std::cout << "player '" << players[i] << "'" << std::endl;
+			std::cout << "player '" << players[i].socket << "'" << ", " << players[i].player_name << std::endl;
 		}
 	}
 	unlock();
 }
 
-FR Room::isin(SOCKET player) {
+FR Room::isin(ClientSock player) {
 	lock();
 	for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
-		if (player == players[i]) {
+		if (player.socket == players[i].socket) {
 			unlock();
 			return FR::SUCCESS;
 		}
@@ -81,18 +81,18 @@ FR Room::isin(SOCKET player) {
 
 }
 
-void Room::chatToRoom(SOCKET player, char* buf, int buf_size) {
+void Room::chatToRoom(ClientSock player, char* buf, int buf_size) {
 	lock();
 	MYCMD cmd;
 	for (int i = 0; i < MAX_ROOM_PLAYER; i++) {
 		//player != players[i] && 
-		if (players[i] != NULL) {
+		if (players[i].socket != NULL && players[i].socket != player.socket) {
 			cmd.nCode = CMDCODE::CMD_ROOMCHAT;
-			std::cout << "send to " << players[i] << " :" << buf << std::endl;
+			std::cout << "send to " << players[i].socket << "(" << players[i].player_name << ") :" << buf << std::endl;
 			// cmd send
-			send(players[i], (char*)&cmd, sizeof(cmd), 0);
+			send(players[i].socket, (char*)&cmd, sizeof(cmd), 0);
 			// buf send
-			send(players[i], buf, buf_size, 0);
+			send(players[i].socket, buf, buf_size, 0);
 		}
 	}
 	unlock();
@@ -121,14 +121,14 @@ void Rooms_manager::unlock() {
 	LeaveCriticalSection(&m_room_list_cs);
 }
 
-FR Rooms_manager::enter_room(SOCKET player) {
+FR Rooms_manager::enter_room(ClientSock player) {
 	lock();
 	if (room_list.empty()) {
 		std::string roomname("Room no. ");
 		Room* room = new Room((roomname + std::to_string(room_no++)));
 		room->enter_room(player);
 		room_list.push_back(room);
-		std::cout << "player '" << player << "'successfully joined." << std::endl;
+		std::cout << "player '" << player.socket << "(" << player.player_name << ")'successfully joined." << std::endl;
 		unlock();
 		return FR::SUCCESS;
 	}
@@ -137,7 +137,7 @@ FR Rooms_manager::enter_room(SOCKET player) {
 		FR success = FR::F_ERROR;
 		for (it = room_list.begin(); it != room_list.end(); it++) {
 			if ((success = (*it)->enter_room(player)) == FR::SUCCESS) {
-				std::cout << "player '" << player << "'successfully joined." << std::endl;
+				std::cout << "player '" << player.socket << "(" << player.player_name << ")'successfully joined." << std::endl;
 				unlock();
 				return FR::SUCCESS;
 			}
@@ -147,7 +147,7 @@ FR Rooms_manager::enter_room(SOCKET player) {
 			Room* room = new Room((roomname + std::to_string(room_no++)));
 			room->enter_room(player);
 			room_list.push_back(room);
-			std::cout << "player '" << player << "'successfully joined." << std::endl;
+			std::cout << "player '" << player.socket << "(" << player.player_name << ")'successfully joined." << std::endl;
 			unlock();
 			return FR::SUCCESS;
 		}
@@ -156,7 +156,7 @@ FR Rooms_manager::enter_room(SOCKET player) {
 	return FR::F_ERROR;
 }
 
-FR Rooms_manager::leave(SOCKET player) {
+FR Rooms_manager::leave(ClientSock player) {
 	lock();
 	std::list<Room*>::iterator it;
 	Room* temp;
@@ -198,7 +198,7 @@ void Rooms_manager::display() {
 	unlock();
 }
 
-void Rooms_manager::chatToRoom(SOCKET player, char* buf, int buf_size) {
+void Rooms_manager::chatToRoom(ClientSock player, char* buf, int buf_size) {
 	std::list<Room*>::iterator it;
 	lock();
 	for (it = room_list.begin(); it != room_list.end(); it++) {
