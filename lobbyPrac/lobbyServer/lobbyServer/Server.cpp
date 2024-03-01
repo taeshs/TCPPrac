@@ -14,6 +14,9 @@ CRITICAL_SECTION g_c_cs;
 Rooms_manager g_rm;
 
 DB g_db;
+int g_gameStatus = -1;
+
+
 
 void g_Lock() { // client list lock
 	EnterCriticalSection(&g_c_cs);
@@ -85,17 +88,18 @@ void RoomManagerThread() {
 // 방 들옴.
 void RoomThread(ClientSock sock) {
 	std::cout << "client '" << sock.socket << "' joined." << std::endl;
+	
 	char buf[128];
 	MYCMD cmd;
 	int score = g_db.getScore((SQLCHAR*)sock.player_name);
 	cmd.nCode = CMDCODE::CMD_ENTERROOM;
-	send(sock.socket, (char*)&cmd, sizeof(cmd), 0);
+	send(sock.socket, (char*)&cmd, sizeof(cmd), 0); // TO CLI ROOM RECVER
 
 	g_rm.enter_room(sock);
-	while(recv(sock.socket, (char*)&cmd, sizeof(cmd), 0) > 0) {
+	while(recv(sock.socket, (char*)&cmd, sizeof(cmd), 0) > 0) { // FROM CLI ROOM SENDER
 		std::cout<<score++<<std::endl;
 		std::cout << "room thread" << std::endl;
-		if (cmd.nCode == CMDCODE::CMD_LEAVEROOM) {
+		if (cmd.nCode == CMDCODE::CMD_LEAVEROOM) { // g_gameStatus 로 나가기 하기. Working
 			g_Lock();
 			g_cli_list.push_back(sock);
 			g_Unlock();
@@ -162,6 +166,8 @@ void threadFunc(ClientSock sock) {
 	custom_list_remove(sock.socket);
 	closesocket(sock.socket);
 }
+
+
 
 int main() {
 	InitializeCriticalSection(&g_c_cs);
