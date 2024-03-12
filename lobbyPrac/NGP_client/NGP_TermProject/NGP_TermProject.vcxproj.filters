@@ -1,0 +1,127 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="소스 파일\NGP">
+      <UniqueIdentifier>{96063650-b107-4ef7-9365-e386126f74e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\NGP">
+      <UniqueIdentifier>{d67b5410-6919-4855-85b1-3a86c214f676}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="Global.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="NGP_TermProject.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="winsock.h">
+      <Filter>헤더 파일\NGP</Filter>
+    </ClInclude>
+    <ClInclude Include="winmainapp.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\mylib\myheader.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="FileName.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="NGP_TermProject.cpp">
+      <Filter>소스 파일\NGP</Filter>
+    </ClCompile>
+    <ClCompile Include="Player.cpp">
+      <Filter>소스 파일\NGP</Filter>
+    </ClCompile>
+    <ClCompile Include="winsock.cpp">
+      <Filter>소스 파일\NGP</Filter>
+    </ClCompile>
+    <ClCompile Include="winmainapp.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="NGP_TermProject.rc">
+      <Filter>리소스 파일</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="small.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="NGP_TermProject.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="Background.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="bitmap2.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="Character.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="bitmap3.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="character1.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="character2.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="스킬1.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="스킬2.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="스킬3.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="loading.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="draw.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="win.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="loss.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="1p.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="2p.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

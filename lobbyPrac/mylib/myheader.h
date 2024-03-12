@@ -7,7 +7,7 @@
 #include <string>
 #include <conio.h>
 
-#define MAX_ROOM_PLAYER 3
+#define MAX_ROOM_PLAYER 2
 #define MAX_PLAYER_NAME_SIZE 21
 #define MAX_PASSWORD_SIZE 21
 
