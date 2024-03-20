@@ -25,7 +25,11 @@ int Player::getPosY() {
 	return pos.y;
 }
 
-void Player::move(float x, float y) {
-	pos.x += x;
-	pos.y += y;
+void Player::move(float x, float y, int left, int right, int top, int bottom) {
+	if (pos.x < right && pos.x > left) {
+		pos.x += x;
+	}
+	if (pos.y < bottom && pos.y > top) {
+		pos.y += y;
+	}
 }

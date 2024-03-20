@@ -3,8 +3,9 @@
 
 #include "framework.h"
 #include "GameClient.h"
-#include "Global.h"
+#include "socket.h"
 #include "Player.h"
+
 
 #define MAX_LOADSTRING 100
 
@@ -13,7 +14,7 @@ HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 
-Player p1(50,50);
+Player p1(100,100);
 
 void ColoredRect(HDC hdc, int left, int top, int right, int bottom, COLORREF color);
 
@@ -21,9 +22,13 @@ void ColoredRect(HDC hdc, int left, int top, int right, int bottom, COLORREF col
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    WndProc2(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 void mover(HWND hwnd);
+void chatter();
+
+WS_CLIENT g_client;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -49,9 +54,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_GAMECLIENT));
 
     MSG msg;
+    AllocConsole();
+    freopen("CONIN$", "rb", stdin);
+    freopen("CONOUT$", "wb", stdout);
+    freopen("CONOUT$", "wb", stderr);
+    g_client.initiate();
+
+    std::thread chatthread(chatter);
+    
 
     std::thread keythread(mover, msg.hwnd);
-    keythread.detach();
+    
+    std::thread recvthread(&WS_CLIENT::recieverThread, &g_client);
+    
 
     // 기본 메시지 루프입니다:
    /* while (GetMessage(&msg, nullptr, 0, 0))
@@ -80,7 +95,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         mover(msg.hwnd);
         
     }
-
+    chatthread.join();
+    keythread.join();
+    recvthread.join();
     return (int) msg.wParam;
 }
 
@@ -93,7 +110,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
-    WNDCLASSEXW wcex;
+    WNDCLASSEXW wcex, wcex2;
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
@@ -108,6 +125,14 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_GAMECLIENT);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    
+    /*wcex2 = wcex;
+    wcex2.lpszMenuName = NULL;
+    wcex2.lpszClassName = L"h2";
+    wcex2.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex2.lpfnWndProc = WndProc2;
+
+    RegisterClassExW(&wcex2);*/
 
     return RegisterClassExW(&wcex);
 }
@@ -129,6 +154,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
+   //HWND hWnd2 = CreateWindowW(L"h2", L"h2", WS_OVERLAPPEDWINDOW,
+   //    1200, 100, 200, 500, nullptr, nullptr, hInstance, nullptr);
+
    if (!hWnd)
    {
       return FALSE;
@@ -136,6 +164,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
+   //ShowWindow(hWnd2, nCmdShow);
+   //UpdateWindow(hWnd2);
 
    return TRUE;
 }
@@ -192,15 +222,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             oldBackBit = (HBITMAP)SelectObject(hdc, BackBit);
             PatBlt(hdc, 0, 0, rect.right, rect.bottom, WHITENESS);
             
-            int playersize = 40;
+            int playersize = 20;
+
+            //printf("%d\n", &g_client.other_playercnt);
+            //std::cout << g_client.other_playercnt << std::endl;
+            for (int i = 0; i < g_client.other_playercnt; i++) {
+                ColoredRect(hdc, g_client.cps[i].x + playersize, g_client.cps[i].y + playersize,
+                    g_client.cps[i].x - playersize, g_client.cps[i].y - playersize,
+                    RGB(255, 0, 0));
+            }
             
             ColoredRect(hdc, p1.getPosX() + playersize, p1.getPosY() + playersize,
                 p1.getPosX() - playersize, p1.getPosY() - playersize,
                 RGB(255,0,0));
-            ColoredRect(hdc, p1.getPosX() + playersize + playersize, p1.getPosY() + playersize + playersize,
-                p1.getPosX() - playersize + playersize, p1.getPosY() - playersize + playersize,
-                RGB(0, 0, 255));
-            //Rectangle(hdc, p1.getPosX() + playersize, p1.getPosY() + playersize, p1.getPosX() - playersize, p1.getPosY() - playersize);
 
             
             GetClientRect(hWnd, &rect);
@@ -217,43 +251,54 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PostQuitMessage(0);
         break;
     case WM_KEYDOWN:
-
-        
-        //switch (wParam) { // 가상키 처리
-        //case VK_LEFT:
-        //    p1.move(-8, 0);
-        //    break;
-        //case VK_RIGHT:
-        //    p1.move(8, 0);
-        //    break;
-        //case VK_UP:
-        //    p1.move(0, -8);
-        //    break;
-        //case VK_DOWN:
-        //    p1.move(0, 8);
-        //    break;
-        //}
-        /*InvalidateRect(hWnd, NULL, TRUE);
-        UpdateWindow(hWnd);*/
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
 }
-void mover(HWND hWnd) {
-    if (GetAsyncKeyState(VK_LEFT)) {
-        p1.move(-.1f, 0);
+
+void chatter() {
+    std::string str;
+    std::cout << "chat : ";
+    char buf[256];
+    
+
+    while (true) {
+        std::cin >> str;
+        strcpy(buf, str.c_str());
+        g_client.sendMessage(buf, sizeof(buf));
+        std::cout << buf << std::endl;
+        if (g_client.chatlist.size() < 10) {
+            g_client.chatlist.push_back("from me : "+str);
+        }
+        else {
+            g_client.chatlist.pop_front();
+            g_client.chatlist.push_back(str);
+        }
+        g_client.displayChatlist();
     }
-    if (GetAsyncKeyState(VK_RIGHT)) {
-        p1.move(.1f, 0);
+    
+}
+
+void mover(HWND hWnd) {
+    RECT clientrect;
+    GetClientRect(hWnd, &clientrect);
+
+    if (GetAsyncKeyState(VK_LEFT)) {
+        p1.move(-.1f, 0, clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
+    }
+    else if (GetAsyncKeyState(VK_RIGHT)) {
+        p1.move(.1f, 0, clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
     }
     if (GetAsyncKeyState(VK_UP)) {
-        p1.move(0, -.1f);
+        p1.move(0, -.1f, clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
     }
-    if (GetAsyncKeyState(VK_DOWN)) {
-        p1.move(0, .1f);
+    else if (GetAsyncKeyState(VK_DOWN)) {
+        p1.move(0, .1f, clientrect.left, clientrect.right, clientrect.top, clientrect.bottom);
     }
+    g_client.sendPlayer(p1.getPos());
+
     InvalidateRect(hWnd, NULL, FALSE);
 }
 
