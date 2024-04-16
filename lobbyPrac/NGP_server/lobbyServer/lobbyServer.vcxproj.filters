@@ -44,7 +44,7 @@
     <ClInclude Include="NGP\ngp.h">
       <Filter>헤더 파일\NGP</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\mylib\myheader.h">
+    <ClInclude Include="..\..\mylib\myheader.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

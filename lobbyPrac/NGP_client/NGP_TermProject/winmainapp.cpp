@@ -1,4 +1,4 @@
-#include "../../../mylib/myheader.h"
+#include "../../mylib/myheader.h"
 #include "NGP_TermProject.h"
 #include <CommCtrl.h>
 #include "winmainapp.h"

@@ -45,7 +45,7 @@
     <ClInclude Include="winmainapp.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\mylib\myheader.h">
+    <ClInclude Include="..\..\mylib\myheader.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

@@ -146,7 +146,7 @@
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\mylib\myheader.h" />
+    <ClInclude Include="..\..\mylib\myheader.h" />
     <ClInclude Include="db.h" />
     <ClInclude Include="NGP\ngp.h" />
     <ClInclude Include="Rooms.h" />

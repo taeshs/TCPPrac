@@ -1,245 +1,137 @@
 #include <iostream>
-#include <WinSock2.h>
 #include <thread>
+#include <vector>
 #include <list>
+#include <WinSock2.h>
+#pragma comment(lib, "ws2_32.lib")
 
-#pragma comment(lib,"ws2_32.lib")
+constexpr int PORTS = 8888;
+constexpr int MAXTHREADS = 4;
+constexpr int BUFSIZE = 1024;
 
-#define MAX_THREAD_CNT	4
+using namespace std;
 
-CRITICAL_SECTION g_cs;
-HANDLE g_hIocp; 
-SOCKET g_lsock;
-std::list<SOCKET> g_listClient;
+HANDLE g_iocp;
+vector<thread> g_worker_threads;
+list<SOCKET> g_clients;
 
-typedef struct _USERSESSION {
-	SOCKET hSocket;
-	char buffer[8192];
-}USERSESSION;
+typedef struct CLIENT_SESSION {
+	SOCKET sock;
+	char buf[BUFSIZE];
+};
 
-void CloseClient(SOCKET sock){
-	shutdown(sock, SD_BOTH);
-	closesocket(sock);
-
-	EnterCriticalSection(&g_cs);
-	g_listClient.remove(sock);
-	LeaveCriticalSection(&g_cs);
-}
-
-void SendMessageAll(char* buf, int nSize) {
-	std::list<SOCKET>::iterator it;
-
-	EnterCriticalSection(&g_cs);
-	for (it = g_listClient.begin(); it != g_listClient.end(); it++) {
-		send(*it, buf, nSize,0);
+void sendAll(SOCKET sock, char* buf, int len) {
+	list<SOCKET>::iterator it;
+	for (it = g_clients.begin(); it != g_clients.end(); it++) {
+		if (*it != sock) {
+			send(*it, buf, len, 0);
+		}
 	}
-	LeaveCriticalSection(&g_cs);
 }
 
-void CloseAll()
-{
-	std::list<SOCKET>::iterator it;
-
-	::EnterCriticalSection(&g_cs);
-	for (it = g_listClient.begin(); it != g_listClient.end(); ++it)
-	{
-		::shutdown(*it, SD_BOTH);
-		::closesocket(*it);
-	}
-	::LeaveCriticalSection(&g_cs);
-}
-
-BOOL CtrlHandler(DWORD dwType)
-{
-	if (dwType == CTRL_C_EVENT)
-	{
-		CloseAll();
-		::Sleep(500);
-
-		//Listen ¼ÒÄÏÀ» ´Ý´Â´Ù.
-		::shutdown(g_lsock, SD_BOTH);
-		::closesocket(g_lsock);
-		g_lsock = NULL;
-
-		//IOCP ÇÚµéÀ» ´Ý´Â´Ù. ÀÌ·¸°Ô ÇÏ¸é GQCS() ÇÔ¼ö°¡ FALSE¸¦ ¹ÝÈ¯ÇÏ¸ç
-		//:GetLastError() ÇÔ¼ö°¡ ERROR_ABANDONED_WAIT_0À» ¹ÝÈ¯ÇÑ´Ù.
-		//IOCP ½º·¹µåµéÀÌ ¸ðµÎ Á¾·áµÈ´Ù.
-		::CloseHandle(g_hIocp);
-		g_hIocp = NULL;
-
-		//IOCP ½º·¹µåµéÀÌ Á¾·áµÇ±â¸¦ ÀÏÁ¤½Ã°£ µ¿¾È ±â´Ù¸°´Ù.
-		::Sleep(500);
-		::DeleteCriticalSection(&g_cs);
-
-		puts("*** Ã¤ÆÃ¼­¹ö¸¦ Á¾·áÇÕ´Ï´Ù! ***");
-		::WSACleanup();
-		exit(0);
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
-
-DWORD ThreadComplete() {
-	DWORD dwTransferredSize = 0;
-	DWORD dwFlag = 0;
-	USERSESSION* pSession = NULL;
-	LPWSAOVERLAPPED pWol = NULL;
-	BOOL bResult;
-
-	puts("[IOCP ÀÛ¾÷ÀÚ ½º·¹µå ½ÃÀÛ]");
+void threadFunc() {
+	BOOL result;
+	DWORD byteTransffered, flag;
+	CLIENT_SESSION *c_session;
+	ULONG_PTR key;
+	LPOVERLAPPED pol;
+	cout << "workerthread init"<<endl;
 	while (1) {
-		bResult = GetQueuedCompletionStatus(
-			g_hIocp,
-			&dwTransferredSize,
-			(PULONG_PTR)&pSession,
-			&pWol,
-			INFINITE
-		);
-
-		if (bResult) {
-			// Á¤»ó
-			if (dwTransferredSize == 0) {
-				// Á¤»óÁ¾·á
-				CloseClient(pSession->hSocket);
-				delete pWol;
-				delete pSession;
-				puts("\tGQCS : Å¬¶óÀÌ¾ðÆ®°¡ Á¤»ó ¿¬°á Á¾·áÇÔ.");
-			}
-			else {
-				SendMessageAll(pSession->buffer, dwTransferredSize);
-				memset(pSession->buffer, 0, sizeof(pSession->buffer));
-
-				DWORD dwRecievedSize = 0;
-				DWORD dwFlag = 0;
-				WSABUF wsaBuf = { 0 };
-				wsaBuf.buf = pSession->buffer;
-				wsaBuf.len = sizeof(pSession->buffer);
-				WSARecv(
-					pSession->hSocket,
-					&wsaBuf,
-					1,
-					&dwRecievedSize,
-					&dwFlag,
-					pWol,
-					NULL
-				);
-				if (::WSAGetLastError() != WSA_IO_PENDING)
-					puts("\tGQCS: ERROR WSARecv()");
-			}
+		byteTransffered = 0; flag = 0;
+		result = GetQueuedCompletionStatus(g_iocp, &byteTransffered, &key, &pol, INFINITE);//(PULONG_PTR)&c_session, &pol, INFINITE);
+		if (result == false) {
+			continue;
+		}
+		c_session = (CLIENT_SESSION*)key;
+		if (byteTransffered == 0) {
+			// free
+			delete c_session;
+			delete pol;
 		}
 		else {
-			// ºñÁ¤»ó
-			if (pWol == NULL) {
-				// ¿Ï·á Å¥¿¡¼­ ¿Ï·á ÆÐÅ¶À» ²¨³»Áö ¸øÇÏ°í ¹ÝÈ¯ÇÑ °æ¿ì.
-				// iocpÇÚµéÀÌ ´ÝÈù(¼­¹ö Á¾·á)°æ¿ìµµ ÇØ´ç.
-				puts("\tGQCS: IOCP ÇÚµéÀÌ ´ÝÇû½À´Ï´Ù.");
-				break;
-			}
-			else {
-				// Å¬¶óÀÌ¾ðÆ® ºñÁ¤»ó Á¾·á È¤Àº ¼­¹ö°¡ ¸ÕÀú ¿¬°á Á¾·á.
-				if (pSession != NULL) {
-					CloseClient(pSession->hSocket);
-					delete pWol;
-					delete pSession;
-				}
-				puts("\tGQCS: ¼­¹ö Á¾·á È¤Àº ºñÁ¤»óÀû ¿¬°á Á¾·á");
-			}
+			cout << "from " << c_session->sock << " : " << c_session->buf << endl;
+			sendAll(c_session->sock, c_session->buf, byteTransffered);
+			ZeroMemory(c_session->buf, BUFSIZE);
+
+			WSABUF wsabuf;
+			wsabuf.buf = c_session->buf;
+			wsabuf.len = BUFSIZE;
+			byteTransffered = 0; flag = 0;
+			ZeroMemory(pol, sizeof(OVERLAPPED));
+			WSARecv(c_session->sock, &wsabuf, 1, &byteTransffered, &flag, pol, 0);
 		}
 	}
-
-	puts("[IOCP ÀÛ¾÷ÀÚ ½º·¹µå Á¾·á]");
-	return 0;
-}
-
-DWORD ThreadAcceptLoop() {
-	LPWSAOVERLAPPED pWol = NULL;
-	DWORD dwReceiveSize, dwFlag;
-	USERSESSION* pNewUser;
-	int nAddrSize = sizeof(SOCKADDR);
-	WSABUF wsaBuf;
-	SOCKADDR caddr;
-	SOCKET csock;
-	int nRecvResult = 0;
-
-	while ((csock = accept(g_lsock, &caddr, &nAddrSize)) != INVALID_SOCKET) {
-		std::cout << "»õ Å¬¶óÀÌ¾ðÆ® ¿¬°á." << std::endl;
-		EnterCriticalSection(&g_cs);
-		g_listClient.push_back(csock);
-		LeaveCriticalSection(&g_cs);
-
-		pNewUser = new USERSESSION;
-		ZeroMemory(pNewUser, sizeof(USERSESSION));
-		pNewUser->hSocket = csock;
-
-		pWol = new WSAOVERLAPPED;
-		ZeroMemory(pWol, sizeof(WSAOVERLAPPED));
-
-		// ¿¬°áÇÑ ¼ÒÄÏÀ» IOCP¿¡ ¿¬°á
-		CreateIoCompletionPort((HANDLE)csock, g_hIocp,
-			(ULONG_PTR)pNewUser,
-			0);
-
-		dwReceiveSize = 0;
-		dwFlag = 0;
-		wsaBuf.buf = pNewUser->buffer;
-		wsaBuf.len = sizeof(pNewUser->buffer);
-
-		nRecvResult = WSARecv(csock, &wsaBuf, 1, &dwReceiveSize, &dwFlag, pWol, NULL);
-		if (::WSAGetLastError() != WSA_IO_PENDING)
-			puts("ERROR: WSARecv() != WSA_IO_PENDING");
-	}
-
-	return 0;
 }
 
 int main() {
-	WSADATA wsa = { 0 };
+	WSADATA wsa;
+	int errcode = WSAStartup(MAKEWORD(2, 2), &wsa);
+	if (errcode == SOCKET_ERROR) {
+		cerr << "ERROR : WSA_STARTUP " << errcode << endl;
+		return 1;
+	}
 
-	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-		std::cout << "ERROR : winsock ÃÊ±âÈ­ ½ÇÆÐ" << std::endl;
+	SOCKET lsock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+	if (lsock == INVALID_SOCKET) {
+		cerr << "ERROR : CREATE SOCKET : " << GetLastError() << endl;
 		return 0;
 	}
 
-	if (::SetConsoleCtrlHandler(
-		(PHANDLER_ROUTINE)CtrlHandler, TRUE) == FALSE)
-		puts("ERROR: Ctrl+C Ã³¸®±â¸¦ µî·ÏÇÒ ¼ö ¾ø½À´Ï´Ù.");
-
-	InitializeCriticalSection(&g_cs);
-	g_hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-	if (g_hIocp == NULL) {
-		std::cout << "ERROR : iocp »ý¼º ½ÇÆÐ" << std::endl;
+	g_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+	if (g_iocp == NULL) {
+		cerr << "ERROR : CREATE COMPLETION PORT : " << GetLastError() << endl;
 		return 0;
 	}
-
-	for (int i = 0; i < MAX_THREAD_CNT; i++) {
-		std::thread t1(ThreadComplete);
-		t1.detach();
-	}
-
-	g_lsock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP,
-		NULL, 0, WSA_FLAG_OVERLAPPED);
-	SOCKADDR_IN saddr = { 0 };
+	SOCKADDR_IN saddr;
 	saddr.sin_family = AF_INET;
-	saddr.sin_port = htons(8888);
+	saddr.sin_port = htons(PORTS);
 	saddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
 
-	if (bind(g_lsock, (SOCKADDR*)&saddr, sizeof(saddr)) == SOCKET_ERROR) {
-		std::cout << "ERROR : bind ½ÇÆÐ" << std::endl;
+	if (bind(lsock, (SOCKADDR*)&saddr, sizeof(saddr)) == SOCKET_ERROR) {
+		cerr << "ERROR : bind : " << GetLastError() << endl;
 		return 0;
 	}
-
-	if (listen(g_lsock, SOMAXCONN) == SOCKET_ERROR) {
-		std::cout << "ERROR : listen ½ÇÆÐ" << std::endl;
+	if (listen(lsock, SOMAXCONN) == SOCKET_ERROR) {
+		cerr << "ERROR : listen : " << GetLastError() << endl;
 		return 0;
 	}
+	;
 
-	std::thread t1(ThreadAcceptLoop);
-	t1.detach();
+	for (int o = 0; o < MAXTHREADS; o++) {
+		g_worker_threads.emplace_back(threadFunc);
+	}
 
-	std::cout << "Ã¤ÆÃ¼­¹ö ½ÃÀÛ." << std::endl;
-	while (true) getchar(); // main ÇÔ¼ö ¹ÝÈ¯ ¹æÁö
+	SOCKET csock; // í†µì‹ ì†Œì¼“
+	SOCKADDR_IN caddr;
+	int caddr_size = sizeof(caddr);
+	
+	CLIENT_SESSION* client_session;
+	WSABUF wsabuf;
+	DWORD flag, byterecved;
+	LPOVERLAPPED ol;
 
-	return 0;
+	while (1) {
+		csock = accept(lsock, (SOCKADDR*)&caddr, &caddr_size);
+		if (csock == INVALID_SOCKET) {
+			cerr << "ERROR : SOCKET accept : " << WSAGetLastError() << endl;
+			closesocket(csock);
+			continue;
+		}
+		cout << "accepted." << endl;
+		client_session = new CLIENT_SESSION;
+		ZeroMemory(client_session, sizeof(CLIENT_SESSION));
+		ol = new OVERLAPPED;
+		ZeroMemory(ol, sizeof(OVERLAPPED));
+		
+		client_session->sock = csock;
+		CreateIoCompletionPort((HANDLE)csock, g_iocp, (ULONG_PTR)client_session, 0);
+		g_clients.push_back(csock);
+
+		wsabuf.buf = client_session->buf;
+		wsabuf.len = BUFSIZE;
+		flag = 0;
+		byterecved = 0;
+
+		WSARecv(csock, &wsabuf, 1, &byterecved, &flag, ol, 0);
+	}
 }

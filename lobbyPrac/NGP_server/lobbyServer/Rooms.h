@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../mylib/myheader.h"
+#include "../../mylib/myheader.h"
 #include "NGP/ngp.h"
 
 typedef enum connection_status {
